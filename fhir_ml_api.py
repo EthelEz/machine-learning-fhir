@@ -11,7 +11,7 @@ _ = load_dotenv(find_dotenv())
 app = Flask(__name__)
 
 # Load the trained model using PyCaret
-model = load_model('fhir_classifier')
+model = load_model('fhir_ethnicity_classifier')
 
 # Define the FHIR API endpoint
 api_url = os.environ["api_url"]
