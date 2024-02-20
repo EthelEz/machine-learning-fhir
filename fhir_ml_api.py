@@ -4,13 +4,17 @@ import pandas as pd
 import requests
 import uvicorn
 
+from dotenv import load_dotenv, find_dotenv
+
+_ = load_dotenv(find_dotenv())
+
 app = Flask(__name__)
 
 # Load the trained model using PyCaret
 model = load_model('fhir_classifier')
 
 # Define the FHIR API endpoint
-FHIR_API_ENDPOINT = 'http://localhost:8090/fhir/Observation'
+api_url = os.environ["api_url"]
 
 # Define the endpoint for making predictions
 @app.route('/predict', methods=['POST'])
@@ -25,7 +29,6 @@ def predict():
     predictions = predict_model(model, data=input_data)
     
     # Convert the prediction to FHIR-compliant format
-    # prediction_value = predictions['Label'].iloc[0]
     prediction_value = predictions.iloc[0][-1] 
     fhir_prediction = {
         "resourceType": "Observation",
@@ -45,8 +48,14 @@ def predict():
     return jsonify(fhir_prediction)
 
 @app.route('/send_to_fhir', methods=['POST'])
-def send_to_fhir():
+async def send_to_fhir():
     # Get input data from the request
+    token = await get_access_token()
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+    
     data = request.json
     
     # Convert the input data into a DataFrame
@@ -75,7 +84,7 @@ def send_to_fhir():
     }
     
     # Send the FHIR-compliant prediction data to the FHIR API
-    response = requests.post(FHIR_API_ENDPOINT, json=fhir_prediction)
+    response = requests.post(api_url, json=fhir_prediction, headers=headers)
     
     # Check if the request was successful
     if response.status_code == 201:
