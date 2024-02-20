@@ -8,19 +8,6 @@ def calculate_age(date_of_birth):
     age = current_date.year - dob.year - ((current_date.month, current_date.day) < (dob.month, dob.day))
     return age
 
-def elapsed_time(repord_issued):
-    report_issue_date = datetime.strptime(repord_issued, '%Y-%m-%dT%H:%M:%S%z')
-
-    # Current date and time
-    current_date = datetime.now()
-
-    # Calculate time elapsed since the report was issued
-    time_elapsed = current_date.replace(tzinfo=None) - report_issue_date.replace(tzinfo=None)
-
-    # Convert time elapsed to days or any other appropriate unit
-    time_elapsed_days = time_elapsed.days
-    return time_elapsed_days
-
 def diagnostic_freq(issued, effectivetime):
     if issued is not None and effectivetime is not None:
         issued = pd.to_datetime(issued).replace(tzinfo=None)     # Remove timezone information
@@ -58,8 +45,6 @@ async def extract_from_fhir_api(api_url, token):
 
     for rep_data in bundle:
         blood_leukocytes_volume = None
-        # reason_code = None
-        # hospitalization_status = None
         blood_erythrocyte_volume = None
         blood_hemoglobin_volume = None
         blood_hematocrit_volume = None
@@ -68,16 +53,12 @@ async def extract_from_fhir_api(api_url, token):
         mchc_count = None
         erythrocyte_distribution_width_count = None
         platelets_volume_count = None
-        # platelet_distribution_width = None
         platelet_mean_volume_count = None
-        # encounter_type = None
 
         if rep_data is not None:
             date_reported = rep_data.get('effectiveDateTime')
             date_authorised = rep_data.get('issued')
-            # diagnostic_frequency = diagnostic_freq(date_authorised, date_reported)
             elapsed_time_days = elapsed_time(date_authorised)
-            # report_code = rep_data.get_by_path('code.coding.0.code')
 
             patient_data = rep_data.get_by_path('subject.reference')
             if patient_data is not None and '/' in patient_data:
@@ -134,14 +115,10 @@ async def extract_from_fhir_api(api_url, token):
 
             data.append({
                 "elapsed_time_days": elapsed_time_days,
-                # "diagnostic_frequency": diagnostic_frequency,
-                # "dob": dob,
                 "age": age,
                 "gender": gender,
                 "race": race,
                 "blood_leukocytes_volume": blood_leukocytes_volume,
-                # "reason_code": reason_code,
-                # "hospitalization_status": hospitalization_status,
                 "blood_erythrocyte_volume": blood_erythrocyte_volume,
                 "blood_hemoglobin_volume": blood_hemoglobin_volume,
                 "blood_hematocrit_volume": blood_hematocrit_volume,
@@ -150,11 +127,8 @@ async def extract_from_fhir_api(api_url, token):
                 "mchc_count": mchc_count,
                 "erythrocyte_distribution_width_count": erythrocyte_distribution_width_count,
                 "platelets_volume_count": platelets_volume_count,
-                # "platelet_distribution_width": platelet_distribution_width,
                 "platelet_mean_volume_count": platelet_mean_volume_count,
                 "ethnicity": ethnicity
-                # "report_code": report_code,
-                # "encounter_type": encounter_type
             })
 
     df = pd.DataFrame(data)
