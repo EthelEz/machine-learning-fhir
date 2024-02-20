@@ -19,10 +19,8 @@ async def main():
 
     # Call the extract_from_fhir_api function to extract data
     df = await extract_from_fhir_api(api_url, bearer_token)
-    # df.to_csv("fhir_data_modified.csv")
 
     # Now you have a DataFrame containing the extracted data
-    # print(data_df.head())  # Example: Print the first few rows of the DataFrame
     cat_features = ['gender', 'race']
 
     experiment = setup(data = df, target = 'ethnicity', categorical_features = cat_features)
