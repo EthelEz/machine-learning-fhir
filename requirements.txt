@@ -1,0 +1,13 @@
+fhir.resources==6.5.0
+fhirclient==3.2.0
+fhirdatetime==0.1.0b8
+fhirpathpy==0.1.2
+fhirpy==1.3.1
+psycopg2==2.9.6
+psycopg2-binary==2.9.3
+python-dotenv==1.0.0
+regex==2023.6.3
+requests==2.28.2
+requests-cache==0.9.8
+requests-oauthlib==1.3.1
+pycaret==3.2.0
