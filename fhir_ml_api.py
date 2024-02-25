@@ -1,14 +1,16 @@
-from flask import Flask, request, jsonify
-from pycaret.classification import load_model, predict_model
 import pandas as pd
-import requests
+from pycaret.classification import load_model, predict_model
+from fastapi import FastAPI, HTTPException
 import uvicorn
+from pydantic import BaseModel
+from enum import Enum
+import requests
 
 from dotenv import load_dotenv, find_dotenv
 
 _ = load_dotenv(find_dotenv())
 
-app = Flask(__name__)
+app = FastAPI()
 
 # Load the trained model using PyCaret
 model = load_model('fhir_ethnicity_classifier')
@@ -56,8 +58,8 @@ def predict(data: InputModel):
     return {"prediction": prediction_str}
 
 # Define the endpoint for sending data to the FHIR API
-@app.route('/send_to_fhir', methods=['POST'])
-async def send_to_fhir():
+@app.post("/send_to_fhir")
+async def send_to_fhir(patient: Patient, observation: Observation):
     # Get input data from the request
     token = await get_access_token()
     headers = {
@@ -66,18 +68,16 @@ async def send_to_fhir():
     }
     
     # Get input data and patient information from the request
-    data = request.json
-    patient_data = data.get('patient')
-    observation_data = data.get('observation')
-    
-    # Convert the input observation data into a DataFrame
-    input_data = pd.DataFrame(observation_data, index=[0])
+    input_data = pd.DataFrame(observation.dict(), index=[0])
     
     # Make predictions using the loaded model
     predictions = predict_model(model, data=input_data)
-    
+    prediction_column = predictions.columns[14]  # Assuming the prediction column is the first column
+
     # Extract the predicted class label from the predictions
-    prediction_value = predictions.iloc[0][-1]  # Assuming the last column contains the predicted class label
+    prediction_value = int(predictions[prediction_column].iloc[0])
+    print(prediction_value)
+    prediction_str = PredictionEnum.Latino if prediction_value == 1 else PredictionEnum.African
     
     # Convert the prediction to FHIR-compliant format
     fhir_prediction = {
@@ -92,34 +92,33 @@ async def send_to_fhir():
                 }
             ]
         },
-         "interpretation": [
-        {
-          "coding": [
+        "interpretation": [
             {
-              "system": "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretationPrediction",
-              "code": "prediction",
-              "display": "Hispanic or Latino" if prediction_value == 'Hispanic or Latino' else "Not Hispanic or Latino"
+                "coding": [
+                    {
+                        "system": "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretationPrediction",
+                        "code": "prediction",
+                        "display": prediction_str
+                    }
+                ]
             }
-          ]
-        }
-      ]
+        ]
     }
     
     # Add patient information to the FHIR-compliant prediction data
-    if patient_data:
-        fhir_prediction['subject'] = {
-            "reference": f"Patient/{patient_data.get('id')}"  # Assuming patient id is provided in the patient data
-        }
+    fhir_prediction['subject'] = {
+        "reference": f"Patient/{patient.id}"
+    }
     
     # Send the FHIR-compliant prediction data to the FHIR API
-    response = requests.post(FHIR_API_ENDPOINT, json=fhir_prediction, headers=headers)
+    response = requests.post(FHIR_API_ENDPOINT, json=fhir_prediction)
     
     # Check if the request was successful
     if response.status_code == 201:
-        patient_name = patient_data.get('name').get('firstname') if patient_data.get('name') else 'Unknown'
-        return jsonify({"message": f"Prediction data of {patient_name} successfully sent to FHIR API"})
+        patient_name = patient.name.get('firstname', 'Unknown')
+        return {"message": f"Prediction data of {patient_name} successfully sent to FHIR API"}
     else:
-        return jsonify({"message": "Failed to send prediction data to FHIR API"}), response.status_code
+        raise HTTPException(status_code=response.status_code, detail="Failed to send prediction data to FHIR API")
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    uvicorn.run(app, host="127.0.0.1", port=8005)
