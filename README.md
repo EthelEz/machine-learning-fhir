@@ -31,3 +31,38 @@ Utilize FHIR client libraries in [Python](https://docs.smarthealthit.org/client-
       **Please Note** This process takes about 15 to 20 minutes to run. This is due to the size of the dataset we're extracting from the API and loading to Postgres.
 11. After training the model, run `python fhir_ml_api.py` and then go to your preferred browser and run `http://127.0.0.1:8005/docs#`.
 12. You can also use the `Postman` or `Curl` command to test the API.
+
+
+### Using `Postman` to send data to the `Azure FHIR API`
+
+If you are using `Postman`, you can try this example data
+```
+{
+    "patient": {
+        "id": "67d8cf29-e6d8-4661-9776-69d72ba7c96b",
+        "name": {
+            "firstname": "Lowe",
+            "lastname": "Kevin"
+        },
+        "age": 4,
+        "gender": "male",
+        "race": "White"
+    },
+    "observation": {
+        "elapsed_time_days": 1813,
+        "age": 4,
+        "gender": "male",
+        "race": "2106-3",
+        "blood_leukocytes_volume": 8.243,
+        "blood_erythrocyte_volume": 4.1092,
+        "blood_hemoglobin_volume": 16.348,
+        "blood_hematocrit_volume": 36.004,
+        "mcv_count": 82.019,
+        "mch_count": 29.171,
+        "mchc_count": 33.903,
+        "erythrocyte_distribution_width_count": 42.179,
+        "platelets_volume_count": 391.02,
+        "platelet_mean_volume_count": 11.111
+    }
+}
+```
