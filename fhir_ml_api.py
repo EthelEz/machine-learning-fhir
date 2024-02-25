@@ -56,10 +56,13 @@ async def send_to_fhir():
         "Content-Type": "application/json"
     }
     
+    # Get input data and patient information from the request
     data = request.json
+    patient_data = data.get('patient')
+    observation_data = data.get('observation')
     
-    # Convert the input data into a DataFrame
-    input_data = pd.DataFrame(data, index=[0])
+    # Convert the input observation data into a DataFrame
+    input_data = pd.DataFrame(observation_data, index=[0])
     
     # Make predictions using the loaded model
     predictions = predict_model(model, data=input_data)
@@ -80,17 +83,34 @@ async def send_to_fhir():
                 }
             ]
         },
-        "valueString": "Hispanic or Latino" if prediction_value == 'Hispanic or Latino' else "Not Hispanic or Latino"
+         "interpretation": [
+        {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretationPrediction",
+              "code": "prediction",
+              "display": "Hispanic or Latino" if prediction_value == 'Hispanic or Latino' else "Not Hispanic or Latino"
+            }
+          ]
+        }
+      ]
     }
     
+    # Add patient information to the FHIR-compliant prediction data
+    if patient_data:
+        fhir_prediction['subject'] = {
+            "reference": f"Patient/{patient_data.get('id')}"  # Assuming patient id is provided in the patient data
+        }
+    
     # Send the FHIR-compliant prediction data to the FHIR API
-    response = requests.post(api_url, json=fhir_prediction, headers=headers)
+    response = requests.post(FHIR_API_ENDPOINT, json=fhir_prediction, headers=headers)
     
     # Check if the request was successful
     if response.status_code == 201:
-        return jsonify({"message": "Prediction data successfully sent to FHIR API"})
+        patient_name = patient_data.get('name').get('firstname') if patient_data.get('name') else 'Unknown'
+        return jsonify({"message": f"Prediction data of {patient_name} successfully sent to FHIR API"})
     else:
         return jsonify({"message": "Failed to send prediction data to FHIR API"}), response.status_code
 
 if __name__ == '__main__':
-    uvicorn.run(app, host="127.0.0.1", port=8005)
+    app.run(debug=True)
