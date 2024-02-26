@@ -12,8 +12,6 @@ import asyncio
 
 _ = load_dotenv(find_dotenv())
 
-api_url = os.environ["api_url"]
-
 # Define the FHIR API endpoint
 FHIR_API_ENDPOINT = os.environ["api_url"]
 
