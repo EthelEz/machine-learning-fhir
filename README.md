@@ -43,10 +43,7 @@ If you are using `Postman`, you can try this example data
         "name": {
             "firstname": "Lowe",
             "lastname": "Kevin"
-        },
-        "age": 4,
-        "gender": "male",
-        "race": "White"
+        }
     },
     "observation": {
         "elapsed_time_days": 1813,
