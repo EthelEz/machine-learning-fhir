@@ -111,7 +111,7 @@ async def send_to_fhir(patient: Patient, observation: Observation):
     }
     
     # Send the FHIR-compliant prediction data to the FHIR API
-    response = requests.post(FHIR_API_ENDPOINT, json=fhir_prediction)
+    response = requests.post(FHIR_API_ENDPOINT, json=fhir_prediction, headers=headers)
     
     # Check if the request was successful
     if response.status_code == 201:
