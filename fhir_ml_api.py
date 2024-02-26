@@ -6,6 +6,8 @@ from pydantic import BaseModel
 from enum import Enum
 import requests
 
+from access_token import get_access_token
+
 from dotenv import load_dotenv, find_dotenv
 
 _ = load_dotenv(find_dotenv())
