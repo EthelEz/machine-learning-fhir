@@ -21,7 +21,7 @@ FHIR_API_ENDPOINT = os.environ["api_url"]
 app = FastAPI()
 
 # Load trained Pipeline
-model = load_model("fhir_classifier")
+model = load_model("fhir_ethnicity_classifier")
 
 # Pydantic models for request and response
 class Patient_data(BaseModel):
@@ -57,6 +57,9 @@ class OutputModel(BaseModel):
 # Define predict function
 @app.post("/predict", response_model=OutputModel)
 def predict(data: Observation_data):
+    """
+    This is the endpoint that helps in testing the predicted model using Postman.
+    """
     data_df = pd.DataFrame([data.dict()])
     predictions = predict_model(model, data=data_df)
     prediction_column = predictions.columns[14]  # Assuming the prediction column is the first column
@@ -69,6 +72,9 @@ def predict(data: Observation_data):
 
 @app.post("/send_to_fhir")
 async def send_to_fhir(patient: Patient_data, observation: Observation_data):
+    """
+    This is the endpoint that helps send the predicted variable to the FHIR API.
+    """
 
     token = await get_access_token()
 
