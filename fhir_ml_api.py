@@ -7,21 +7,29 @@ from enum import Enum
 import requests
 
 from access_token import get_access_token
-
 from dotenv import load_dotenv, find_dotenv
+import asyncio
 
 _ = load_dotenv(find_dotenv())
 
-app = FastAPI()
-
-# Load the trained model using PyCaret
-model = load_model('fhir_ethnicity_classifier')
-
-# Define the FHIR API endpoint
 api_url = os.environ["api_url"]
 
-# Define input pydantic model
-class InputModel(BaseModel):
+# Define the FHIR API endpoint
+FHIR_API_ENDPOINT = os.environ["api_url"]
+
+# Create the FastAPI app
+app = FastAPI()
+
+# Load trained Pipeline
+model = load_model("fhir_classifier")
+
+# Pydantic models for request and response
+class Patient_data(BaseModel):
+    id: str
+    name: dict
+    code: str
+    
+class Observation_data(BaseModel):
     elapsed_time_days: float
     age: float
     gender: str
@@ -40,7 +48,7 @@ class InputModel(BaseModel):
 # Define an enum for prediction types
 class PredictionEnum(str, Enum):
     Latino = "Hispanic or Latino"
-    African = "African"
+    African = "Not Hispanic or Latino"
 
 # Define output pydantic model with the Enum
 class OutputModel(BaseModel):
@@ -48,7 +56,7 @@ class OutputModel(BaseModel):
 
 # Define predict function
 @app.post("/predict", response_model=OutputModel)
-def predict(data: InputModel):
+def predict(data: Observation_data):
     data_df = pd.DataFrame([data.dict()])
     predictions = predict_model(model, data=data_df)
     prediction_column = predictions.columns[14]  # Assuming the prediction column is the first column
@@ -59,17 +67,13 @@ def predict(data: InputModel):
 
     return {"prediction": prediction_str}
 
-# Define the endpoint for sending data to the FHIR API
 @app.post("/send_to_fhir")
-async def send_to_fhir(patient: Patient, observation: Observation):
-    # Get input data from the request
+async def send_to_fhir(patient: Patient_data, observation: Observation_data):
+
     token = await get_access_token()
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
-    }
-    
-    # Get input data and patient information from the request
+
+    headers = {'Content-Type': 'application/json', 'authorization': f'Bearer {token}'}
+    # Convert the input observation data into a DataFrame
     input_data = pd.DataFrame(observation.dict(), index=[0])
     
     # Make predictions using the loaded model
@@ -78,7 +82,6 @@ async def send_to_fhir(patient: Patient, observation: Observation):
 
     # Extract the predicted class label from the predictions
     prediction_value = int(predictions[prediction_column].iloc[0])
-    print(prediction_value)
     prediction_str = PredictionEnum.Latino if prediction_value == 1 else PredictionEnum.African
     
     # Convert the prediction to FHIR-compliant format
@@ -89,7 +92,7 @@ async def send_to_fhir(patient: Patient, observation: Observation):
             "coding": [
                 {
                     "system": "http://loinc.org",
-                    "code": "9279-1",
+                    "code": "9279-2",
                     "display": "Prediction"
                 }
             ]
@@ -106,21 +109,46 @@ async def send_to_fhir(patient: Patient, observation: Observation):
             }
         ]
     }
-    
+
     # Add patient information to the FHIR-compliant prediction data
     fhir_prediction['subject'] = {
-        "reference": f"Patient/{patient.id}"
+        "reference": f"Patient/{patient.id}"  # Accessing patient attributes directly
     }
     
-    # Send the FHIR-compliant prediction data to the FHIR API
-    response = requests.post(FHIR_API_ENDPOINT, json=fhir_prediction, headers=headers)
+    # Construct the conditional URL to check if the resource exists
+    conditional_url = f"{FHIR_API_ENDPOINT}?subject=Patient/{patient.id}&code={patient.code}"
     
-    # Check if the request was successful
-    if response.status_code == 201:
-        patient_name = patient.name.get('firstname', 'Unknown')
-        return {"message": f"Prediction data of {patient_name} successfully sent to FHIR API"}
-    else:
-        raise HTTPException(status_code=response.status_code, detail="Failed to send prediction data to FHIR API")
+    # Check if the resource exists
+    conditional_response = requests.get(conditional_url, headers=headers)
 
-if __name__ == '__main__':
+    patient_name = patient.name.get('firstname', 'Unknown')
+
+    # If the resource doesn't exist, use POST to create it
+    if conditional_response.json().get('total', 0) == 0:
+        response = requests.post(FHIR_API_ENDPOINT, json=fhir_prediction, headers=headers)
+        if response.status_code == 201:
+            # Resource was created
+            return {"message": f"Prediction data of {patient_name} successfully sent to FHIR API"}
+        else:
+            raise HTTPException(status_code=response.status_code, detail="Failed to create prediction data in FHIR API")
+    
+    # If the resource exists, use PUT to update it
+    elif conditional_response.json().get('total', 0) != 0:
+        resource_id = conditional_response.json()['entry'][0]['resource']['id']
+        # Construct the URL with the resource ID
+        put_url = f"{FHIR_API_ENDPOINT}/{resource_id}"
+        fhir_prediction['id'] = resource_id
+        response = requests.put(put_url, json=fhir_prediction, headers=headers)
+        # print("PUT Request Response:", response.status_code, response.text)
+        if response.status_code == 200:
+            # Resource was updated successfully
+            return {"message": f"Prediction data of {patient_name} successfully updated in FHIR API"}
+        else:
+            raise HTTPException(status_code=response.status_code, detail=f"Failed to update {patient_name} prediction data in FHIR API")
+    
+    else:
+        # Other status codes (e.g., 4xx or 5xx) indicating an error
+        raise HTTPException(status_code=500, detail="Unexpected error occurred while checking resource in FHIR API")
+
+if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8005)
