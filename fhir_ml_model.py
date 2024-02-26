@@ -12,7 +12,10 @@ from dotenv import load_dotenv, find_dotenv
 _ = load_dotenv(find_dotenv())
 
 async def main():
-
+    """
+    This function helps in getting example data from the FHIR API, 
+    train the data using pycaret and save the model. 
+    """
     bearer_token = await get_access_token()
 
     api_url = os.environ["api_url"]
