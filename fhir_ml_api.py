@@ -15,6 +15,8 @@ _ = load_dotenv(find_dotenv())
 # Define the FHIR API endpoint
 FHIR_API_ENDPOINT = os.environ["api_url"]
 
+FHIR_API_ENDPOINT = f"{FHIR_API_ENDPOINT}/Observation"
+
 # Create the FastAPI app
 app = FastAPI()
 
